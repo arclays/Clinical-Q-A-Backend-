@@ -26,12 +26,15 @@ class CustomQuestionSerializer(serializers.ModelSerializer):
 
 
 
-class CustomQuestionCreateUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for creating/updating custom questions"""
+class CustomQuestionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomQuestion
         fields = ["question_text", "requestors_contact", "is_answered"]
 
+class CustomQuestionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomQuestion
+        fields = ["question_text", "requestors_contact", "is_answered"]
 
 
 class QuestionSerializer(serializers.ModelSerializer):

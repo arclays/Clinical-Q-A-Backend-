@@ -14,7 +14,7 @@ class DS_Questions(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Q#{self.id} [{self.disease or 'General'}]: {self.question[:40]}..."
+        return f"{self.disease or 'General'}: {self.question[:40]}..."
 
 
 class DS_Answers(models.Model):
@@ -25,16 +25,15 @@ class DS_Answers(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Answer to: {self.question.id}"
+        return f"Answer to: {self.question}"
         
 class DS_Views(models.Model):
     question = models.ForeignKey(DS_Questions, on_delete=models.CASCADE)
     number_of_clicks = models.PositiveIntegerField(default=0)
     date_asked = models.DateTimeField(auto_now_add=True)
-
-        
+     
     def __str__(self):
-        return f"Views for Q#{self.question.id}: {self.number_of_clicks}"
+        return f"{self.number_of_clicks} Views for {self.question}: "
 
 
     
@@ -46,6 +45,5 @@ class CustomQuestion(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-  
     def __str__(self):
          return f"Q#{self.id}: {self.question_text[:40]}... (answered: {self.is_answered})"

@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+# from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
@@ -7,32 +7,16 @@ from .models import DS_Answers, DS_Questions, CustomQuestion
 from django.db.models import Q, Count, Sum
 
 from .models import DS_Answers, CustomQuestion,DS_Questions, DS_Views
-from .serializers import (
-    DSAnswerSerializer,
-    DSAnswerCreateUpdateSerializer,
-    CustomQuestionSerializer,
-    CustomQuestionCreateSerializer,
-    CustomQuestionUpdateSerializer,
-    QuestionSerializer, 
-    QuestionCreateSerializer, 
-    QuestionUpdateSerializer,
-    QuestionStatusSerializer
-)
+from .serializers import *
 
 
-
+# DS_Answers
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def answer_list_create(request):
-    """
-    List all answers or create a new answer.
-    - GET: Retrieve all answers, optionally filter by `question_id`.
-    - POST: Create a new answer (requires an active question).
-    """
+
     if request.method == "GET":
         answers = DS_Answers.objects.all()
-
-        # Optional filter by question_id
         question_id = request.query_params.get("question_id")
         if question_id:
             answers = answers.filter(question_id=question_id)
@@ -60,11 +44,8 @@ def answer_list_create(request):
 
 
 @api_view(["GET", "PUT", "DELETE"])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def answer_detail(request, pk):
-    """
-    Retrieve, update, or delete a specific answer.
-    """
     answer = get_object_or_404(DS_Answers, pk=pk)
 
     if request.method == "GET":
@@ -100,9 +81,8 @@ def answer_detail(request, pk):
 
 @api_view(["GET"])
 def answers_by_question(request, question_id):
-    """
-    Retrieve all answers for a specific question (only if the question is active).
-    """
+
+    # Retrieve all answers for a specific question (only if the question is active).
     question = get_object_or_404(DS_Questions, id=question_id, status="active")
     answers = DS_Answers.objects.filter(question=question)
 
@@ -110,11 +90,11 @@ def answers_by_question(request, question_id):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-
+# custom_questions
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def custom_questions_list_create(request):
-    """List all custom questions or create a new one"""
+    # List all custom questions and create a new custom_question
     if request.method == "GET":
         questions = CustomQuestion.objects.all()
 
@@ -145,9 +125,9 @@ def custom_questions_list_create(request):
 
 
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def custom_question_detail(request, pk):
-    """Retrieve, update, partially update, or delete a custom question"""
+    # Retrieve, update, partially update, or delete a custom question
     custom_question = get_object_or_404(CustomQuestion, pk=pk)
 
     if request.method == "GET":
@@ -176,18 +156,17 @@ def custom_question_detail(request, pk):
 
 
 @api_view(["PATCH"])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def toggle_custom_question_answered(request, pk):
-    """Toggle answered/unanswered state"""
+    # Unanswered state
     custom_question = get_object_or_404(CustomQuestion, pk=pk)
     custom_question.is_answered = not custom_question.is_answered
     custom_question.save()
     return Response(CustomQuestionSerializer(custom_question).data)
 
-
 @api_view(["GET"])
 def custom_question_search(request):
-    """Search custom questions by text or requestor's contact"""
+    # Search custom questions by text or requestor's contact
     query = request.query_params.get("q", "").strip()
     if not query:
         return Response(
@@ -202,42 +181,27 @@ def custom_question_search(request):
     serializer = CustomQuestionSerializer(results, many=True)
     return Response(serializer.data)
 
-
-
+# DS questions
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticatedOrReadOnly])
-def question_list_create(request):
-    """
-    List all questions or create a new question
-    """
+@permission_classes([])
+def question_list_create(request):  
+    # List all questions or create a new question   
     if request.method == 'GET':
-        # Get all questions
         questions = DS_Questions.objects.all()
-        
-        # Filter by status if provided in query params
         status_filter = request.query_params.get('status')
         if status_filter:
-            questions = questions.filter(status=status_filter)
-        
-        # Filter by disease if provided in query params
+            questions = questions.filter(status=status_filter)   
         disease = request.query_params.get('disease')
         if disease:
-            questions = questions.filter(disease__icontains=disease)
-        
-        # Search by question text if provided
+            questions = questions.filter(disease__icontains=disease)   
         search = request.query_params.get('search')
         if search:
-            questions = questions.filter(question__icontains=search)
-            
-        # Ordering
+            questions = questions.filter(question__icontains=search)        
         order_by = request.query_params.get('order_by', 'created_at')
         if order_by in ['created_at', 'updated_at', 'disease']:
             questions = questions.order_by(order_by)
-        
-        # Get popular questions (most viewed)
         popular = request.query_params.get('popular')
         if popular:
-            # Annotate questions with view count and order by it
             questions = questions.annotate(
                 total_views=Sum('ds_views__number_of_clicks')
             ).order_by('-total_views')
@@ -261,11 +225,10 @@ def question_list_create(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def question_detail(request, pk):
-    """
-    Retrieve, update or delete a question
-    """
+
+    # Retrieve, update or delete a question
     try:
         question = DS_Questions.objects.get(pk=pk)
     except DS_Questions.DoesNotExist:
@@ -302,11 +265,9 @@ def question_detail(request, pk):
         )
 
 @api_view(['PATCH'])
-@permission_classes([IsAuthenticatedOrReadOnly])
+@permission_classes([])
 def update_question_status(request, pk):
-    """
-    Update only the status of a question
-    """
+    # Update only the status of a question
     try:
         question = DS_Questions.objects.get(pk=pk)
     except DS_Questions.DoesNotExist:
@@ -323,9 +284,7 @@ def update_question_status(request, pk):
 
 @api_view(['GET'])
 def questions_by_disease(request, disease_name):
-    """
-    Get all questions for a specific disease
-    """
+    # Get all questions for a specific disease
     questions = DS_Questions.objects.filter(
         disease__icontains=disease_name, 
         status='active'
@@ -336,9 +295,7 @@ def questions_by_disease(request, disease_name):
 
 @api_view(['GET'])
 def question_search(request):
-    """
-    Search questions by text or disease
-    """
+    # Search questions by text or disease
     search_query = request.query_params.get('q', '')
     
     if not search_query:
@@ -357,28 +314,23 @@ def question_search(request):
 
 @api_view(['GET'])
 def active_questions(request):
-    """
-    Get all active questions
-    """
+  
+    # Get all active questions
     questions = DS_Questions.objects.filter(status='active')
     serializer = QuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
 def disabled_questions(request):
-    """
-    Get all disabled questions
-    """
+    # Get all disabled questions
     questions = DS_Questions.objects.filter(status='disabled')
     serializer = QuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
 def popular_questions(request):
-    """
-    Get popular questions (most viewed)
-    """
-    # Get questions annotated with view count and order by it
+   
+    # Get popular questions (most viewed) # Get questions annotated with view count and order by it
     questions = DS_Questions.objects.filter(status='active').annotate(
         total_views=Sum('ds_views__number_of_clicks')
     ).order_by('-total_views')[:10]  # Top 10 most viewed questions
@@ -388,12 +340,10 @@ def popular_questions(request):
 
 @api_view(['GET'])
 def questions_with_most_answers(request):
-    """
-    Get questions with the most answers
-    """
+    # Get questions with the most answers
     questions = DS_Questions.objects.filter(status='active').annotate(
         answer_count=Count('ds_answers')
-    ).order_by('-answer_count')[:10]  # Top 10 questions with most answers
+    ).order_by('-answer_count')[:10]  
     
     serializer = QuestionSerializer(questions, many=True)
     return Response(serializer.data)
