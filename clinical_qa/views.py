@@ -5,11 +5,29 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from .models import DS_Answers, DS_Questions, CustomQuestion
 from django.db.models import Q, Count, Sum
+from django.utils import timezone
+from django.db import connection
 
 from .models import DS_Answers, CustomQuestion,DS_Questions, DS_Views
 from .serializers import *
 
-
+@api_view(['GET'])
+@permission_classes([])
+def health_check(request):
+    # Check database connection
+    try:
+        connection.ensure_connection()
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return Response({
+        "status": "healthy",
+        "message": "Django backend is running",
+        "timestamp": timezone.now().isoformat(),
+        "database": db_status,
+        "endpoints_available": True
+    })
 # DS_Answers
 @api_view(["GET", "POST"])
 @permission_classes([])
@@ -41,8 +59,6 @@ def answer_list_create(request):
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 @api_view(["GET", "PUT", "DELETE"])
 @permission_classes([])
 def answer_detail(request, pk):
@@ -78,7 +94,6 @@ def answer_detail(request, pk):
             status=status.HTTP_204_NO_CONTENT,
         )
 
-
 @api_view(["GET"])
 def answers_by_question(request, question_id):
 
@@ -88,7 +103,6 @@ def answers_by_question(request, question_id):
 
     serializer = DSAnswerSerializer(answers, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 # custom_questions
 @api_view(["GET", "POST"])
@@ -123,7 +137,6 @@ def custom_questions_list_create(request):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @permission_classes([])
 def custom_question_detail(request, pk):
@@ -153,7 +166,6 @@ def custom_question_detail(request, pk):
     elif request.method == "DELETE":
         custom_question.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 @api_view(["PATCH"])
 @permission_classes([])
@@ -206,12 +218,12 @@ def question_list_create(request):
                 total_views=Sum('ds_views__number_of_clicks')
             ).order_by('-total_views')
             
-        serializer = QuestionSerializer(questions, many=True)
+        serializer = DSQuestionSerializer(questions, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
         # Create a new question
-        serializer = QuestionCreateSerializer(data=request.data)
+        serializer = DSQuestionCreateUpdateSerializer(data=request.data)
         if serializer.is_valid():
             question = serializer.save()
             
@@ -219,7 +231,7 @@ def question_list_create(request):
             DS_Views.objects.create(question=question, number_of_clicks=0)
             
             return Response(
-                QuestionSerializer(question).data, 
+                DSQuestionSerializer(question).data, 
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -247,14 +259,14 @@ def question_detail(request, pk):
             view.number_of_clicks += 1
             view.save()
         
-        serializer = QuestionSerializer(question)
+        serializer = DSQuestionSerializer(question)
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        serializer = QuestionUpdateSerializer(question, data=request.data)
+        serializer = DSQuestionCreateUpdateSerializer(question, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(QuestionSerializer(serializer.instance).data)
+            return Response(DSQuestionSerializer(serializer.instance).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
@@ -263,6 +275,31 @@ def question_detail(request, pk):
             {'message': 'Question deleted successfully'}, 
             status=status.HTTP_204_NO_CONTENT
         )
+
+@api_view(['POST'])
+@permission_classes([])
+def question_click(request, pk):
+    # Increment view count when a user clicks on a question.
+    # Uses session to ensure unique click per session.
+    try:
+        question = DS_Questions.objects.get(pk=pk)
+    except DS_Questions.DoesNotExist:
+        return Response({'error': 'Question not found'}, status=404)
+
+    session_key = f'clicked_question_{pk}'
+    if not request.session.get(session_key, False):
+        view, created = DS_Views.objects.get_or_create(
+            question=question,
+            defaults={'number_of_clicks': 0}
+        )
+        if not created:
+            view.number_of_clicks += 1
+            view.save()
+
+        request.session[session_key] = True
+
+    return Response({'message': 'Click registered', 'views': view.number_of_clicks})
+
 
 @api_view(['PATCH'])
 @permission_classes([])
@@ -276,10 +313,10 @@ def update_question_status(request, pk):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    serializer = QuestionStatusSerializer(question, data=request.data, partial=True)
+    serializer = DSQuestionCreateUpdateSerializer(question, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
-        return Response(QuestionSerializer(serializer.instance).data)
+        return Response(DSQuestionSerializer(serializer.instance).data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
@@ -290,7 +327,7 @@ def questions_by_disease(request, disease_name):
         status='active'
     )
     
-    serializer = QuestionSerializer(questions, many=True)
+    serializer = DSQuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -309,7 +346,7 @@ def question_search(request):
         Q(disease__icontains=search_query)
     ).filter(status='active')
     
-    serializer = QuestionSerializer(questions, many=True)
+    serializer = DSQuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -317,14 +354,14 @@ def active_questions(request):
   
     # Get all active questions
     questions = DS_Questions.objects.filter(status='active')
-    serializer = QuestionSerializer(questions, many=True)
+    serializer = DSQuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
 def disabled_questions(request):
     # Get all disabled questions
     questions = DS_Questions.objects.filter(status='disabled')
-    serializer = QuestionSerializer(questions, many=True)
+    serializer = DSQuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -335,7 +372,7 @@ def popular_questions(request):
         total_views=Sum('ds_views__number_of_clicks')
     ).order_by('-total_views')[:10]  # Top 10 most viewed questions
     
-    serializer = QuestionSerializer(questions, many=True)
+    serializer = DSQuestionSerializer(questions, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -345,5 +382,18 @@ def questions_with_most_answers(request):
         answer_count=Count('ds_answers')
     ).order_by('-answer_count')[:10]  
     
-    serializer = QuestionSerializer(questions, many=True)
-    return Response(serializer.data)
+    serializer = DSQuestionSerializer(questions, many=True)
+
+@api_view(['GET'])
+def disease_question_stats(request):
+    """
+    Returns each disease with the count of its related questions.
+    """
+    data = (
+        DS_Questions.objects
+        .filter(status="active")
+        .values('disease')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    return Response(data)

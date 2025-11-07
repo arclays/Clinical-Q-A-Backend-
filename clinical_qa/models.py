@@ -18,9 +18,9 @@ class DS_Questions(models.Model):
 
 
 class DS_Answers(models.Model):
-    question = models.ForeignKey(DS_Questions, on_delete=models.CASCADE)
+    question = models.ForeignKey( DS_Questions, on_delete=models.CASCADE,related_name="answers")
     answer = models.TextField()
-    author = models.CharField(max_length=255, blank=True, null=True)
+    # author = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -29,6 +29,7 @@ class DS_Answers(models.Model):
         
 class DS_Views(models.Model):
     question = models.ForeignKey(DS_Questions, on_delete=models.CASCADE)
+    # answer = models.ForeignKey(DS_Answers, on_delete=models.CASCADE)
     number_of_clicks = models.PositiveIntegerField(default=0)
     date_asked = models.DateTimeField(auto_now_add=True)
      
